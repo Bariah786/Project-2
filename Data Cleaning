@@ -1,0 +1,24 @@
+```python
+
+import pandas as pd
+
+### Loading the data files
+#Products
+url= 'https://drive.google.com/file/d/1_7_0FUsjfKcyaCBfZlhrmNTctACf_6ob/view?usp=drive_link'
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+products_df = pd.read_csv(path)
+
+#Orders
+url= 'https://drive.google.com/file/d/1oHwUzohlDAT161sfzjX5WVQfIZ1ZLQRd/view?usp=drive_link'
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orders_df = pd.read_csv(path)
+
+#Orderlines
+url= 'https://drive.google.com/file/d/1x6BI5Bsb-mLFO-O_gct7WF5UbU4s90Py/view?usp=drive_link'
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orderlines_df = pd.read_csv(path)
+
+#Brands
+url= 'https://drive.google.com/file/d/1ACHWXEnL9TxNWjrtWpxszV29YrJDNWa2/view?usp=drive_link'
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+brands_df = pd.read_csv(path)
