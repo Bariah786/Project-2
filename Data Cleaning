@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-### Loading the data files
+*** Loading the data files ***
 #Products
 url= 'https://drive.google.com/file/d/1_7_0FUsjfKcyaCBfZlhrmNTctACf_6ob/view?usp=drive_link'
 path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
@@ -22,3 +22,174 @@ orderlines_df = pd.read_csv(path)
 url= 'https://drive.google.com/file/d/1ACHWXEnL9TxNWjrtWpxszV29YrJDNWa2/view?usp=drive_link'
 path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
 brands_df = pd.read_csv(path)
+
+*** Creating copies ***
+###Creating copies
+
+products= products_df.copy()
+orders= orders_df.copy()
+orderlines= orderlines_df.copy()
+brands= brands_df.copy()
+
+*** Cleaning Dataframe PRODUCTS:***
+products.info()
+###Dropping duplicates
+
+products.duplicated().value_counts(normalize= True)
+products= products.drop_duplicates()
+
+###Dropping null values
+
+#% of Null values
+(products['price'].isna().value_counts(normalize= True))*100
+
+#Drop rows based on null values in price.
+products = products.dropna(subset= ['price'])
+
+"Column desc and type also have some Null values, but in my opinion, there is no need to drop them as of now."
+
+###Convert column 'price' into data type numeric
+#It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first.
+
+#% of corrupted values
+products['price'].str.count(r'\.').value_counts(normalize= True)
+
+#Sorting the corrupted values
+p2= products.loc[products['price'].str.count('\.')== 2].index
+products.loc[p2,'price']= products.loc[p2,'price'].astype(str)\
+   .str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+
+#Converting 'price' to numeric
+products['price']= pd.to_numeric(products['price'], errors='coerce')
+
+# Correct the position of the decimal by moving it to one digit on the left.
+products.loc[p2,'price']= products.loc[p2,'price']/10
+
+###Changing data type of column Promo_Price from object to numeric.
+#It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first.
+
+products['promo_price'].str.count('\.').value_counts()
+
+*** First idea of cleaning and sorting column Promo_Price:***
+
+#promo_price with zero decimal point
+pp0= products.loc[products['promo_price'].str.count('\.')== 0, ['price', 'promo_price']]
+
+#Promo_Price with 1 decimal point. 
+pp1= products.loc[products['promo_price'].str.count('\.')== 1].index
+
+#Moving a decimal point to one digit left.
+products.loc[pp1,'promo_price']= products.loc[pp1,'promo_price'].astype(str)\
+   .str.replace(r'(\d+)(\.)(\d+)', lambda m: m.group(1)[:len(m.group(1))-1] + '.' + m.group(1)[-1] + m.group(3), regex=True)     
+
+#Promo_Price with 2 decimal points.  
+pp2= products.loc[products['promo_price'].str.count('\.')== 2].index
+
+#Removing the first decimal point.
+products.loc[pp2,'promo_price']= products.loc[pp2,'promo_price'].astype(str)\
+   .str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+
+#Moving the second decimal point to one digit left.
+products.loc[pp2,'promo_price']= products.loc[pp2,'promo_price'].astype(str)\
+   .str.replace(r'(\d+)(\.)(\d+)', lambda m: m.group(1)[:len(m.group(1))-1] + '.' + m.group(1)[-1] + m.group(3), regex=True) 
+
+#Converting 'promo_price' to numeric
+products['promo_price'] = round(pd.to_numeric(products['promo_price']),2)
+
+#Check
+(products.loc [round(products['promo_price']) > round(products['price']) , [('price'), ('promo_price')]].count() \
+       / products.shape[0])*100
+
+*** Second idea of cleaning and sorting column Promo_Price:***
+
+#Removing first dot from values having 2 decimel points
+pp2= products.loc[products['promo_price'].str.count('\.')== 2].index
+products.loc[pp2,'promo_price']= products.loc[pp2,'promo_price'].astype(str)\
+  .str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+
+#Converting 'promo_price' to numeric
+products['promo_price']= pd.to_numeric(products['promo_price'], errors='coerce')
+
+#Filtering out the corrupted values
+mask= products.loc [round(products['promo_price']) > round(products['price'])].index
+
+#Correcting the position of decimal by moving it to one digit left.
+products.loc[mask,'promo_price']= products.loc[mask,'promo_price']/10
+
+#Check
+((products.loc[round(products['promo_price']) > round(products['price'])]).count()/ len(products['promo_price']))*100
+
+#% of still corrupted values
+1.21
+
+#To get rid of them
+still_corrupted= (products.loc[round(products['promo_price']) > round(products['price'])]).index
+products= products.drop(still_corrupted)
+
+"The second idea makes more sense and check gives 0 value means all the promo prices are now either less or equal to the original price.
+And in still corrupted values we just dropped 123 rows(1.21%)"
+
+*** Cleaning Dataframe ORDERS:***
+
+orders.info()
+
+###Duplicates
+
+orders.duplicated().sum()              #has no duplicates
+
+###Droping Null values
+
+#% of Null values
+orders['total_paid'].isna().value_counts(normalize=True)       
+
+#drop Null values
+orders = orders.dropna(axis=0)   #only column 'total_paid' has null values
+
+###Correcting the datatypes
+
+#created_date should become datetime datatype
+orders["created_date"] = pd.to_datetime(orders["created_date"])
+
+***Cleaning Dataframe ORDERLINES:***
+orderlines.info()
+
+###Duplicates
+
+orderlines.duplicated().sum()              #has no duplicates
+
+###Correcting the datatypes
+
+#date should be a datetime datatype
+orderlines["date"] = pd.to_datetime(orderlines["date"])
+
+#unit_price should be a float datatype
+
+# Count the number of decimal points in the unit_price
+orderlines['unit_price'].str.count("\.").value_counts()
+
+#It is a string because it has a few values with two decimal points.
+
+#Let's work out how much that is as a percentage of our total data.
+mult_decimal_rows = (orderlines['unit_price'].str.count("\.")>1).value_counts(normalize= True)        #12.3%
+
+"This is a bit of a tricky decision as 12.3% is a significant amount of our data... and we might even end up losing a larger portion of 
+our data than this too. For the moment we will delete the rows as we only have 2 weeks for this project and I'd like some quick, accurate
+results to show. If we have time at the end, we can come back and investigate this problem further.
+Each row of orderlines represents a product in an order. For example, if order number 175 contained 3 separate products, then order 175 
+would have 3 rows in orderlines, one row for each of the products. If 2 of those products have 'normal' prices (14.99, 15.85) and 1 has a
+price with 2 decimal points (1.137.99), we need to remove the whole order and not just the affected row. If we only remove the row with 2
+decimal places then any later analysis about products and prices could be misleading.
+
+We therefore need to find the order numbers associated with the rows that have 2 decimal points, and then remove all the associated rows."
+
+# Boolean mask to find the orders that contain a price with multiple decimal points
+multiple_decimal_mask = orderlines['unit_price'].str.count("\.") > 1
+
+# Apply the boolean mask to the orderlines DataFrame. This way we can find the order_id of all the affected orders.
+corrupted_order_ids = orderlines.loc[multiple_decimal_mask, 'id_order']
+
+# Keep only the rows that do not have multiple decimal points
+orderlines= orderlines.loc[~orderlines['id_order'].isin(corrupted_order_ids)]
+
+#Values with two decimal points removed so convert the column unit_price to the correct datatype
+orderlines["unit_price"] = pd.to_numeric(orderlines["unit_price"])
