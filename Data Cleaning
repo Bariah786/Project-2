@@ -38,18 +38,51 @@ products.info()
 products.duplicated().value_counts(normalize= True)
 products= products.drop_duplicates()
 
-###Dropping null values
+#Checking for duplicates.
+products['sku'].nunique()           #10579
+len(products['sku'])                #10580
 
-#% of Null values
+"We still have any duplicate rows for the same product. So we need to find it out and drop."
+
+#Let's check first
+products.loc[products.duplicated(subset=['sku'],keep=False)]
+
+#Drop it.
+products.drop_duplicates(subset='sku',inplace=True)
+
+###Dropping Null values
+
+##1. Null values in desc.
+"We gonna use description in further analyses so let's fill its null values with anything"
+
+products.loc[products_df['desc'].isna()]
+#Fill it with the 'name'
+products.loc[products['desc'].isna(),'desc'] = products.loc[products['desc'].isna(),'name']
+
+##2. Null values in price.
+#% of Null values in price
 (products['price'].isna().value_counts(normalize= True))*100
 
-#Drop rows based on null values in price.
-products = products.dropna(subset= ['price'])
+"Column price has 46 null values out of which I guess we can still fill some using the orderlines data frame. Using SKU we can find the Max price 
+of the product at which it has been sold."
 
-"Column desc and type also have some Null values, but in my opinion, there is no need to drop them as of now."
+#Fillin g the missing values of price
+max_sku_prices = orderlines_df.groupby('sku')['unit_price'].max().reset_index()
+merged_df= products.merge(max_sku_prices, on= 'sku', how= 'left') 
+merged_df.loc[merged_df['price'].isna(),'price']= merged_df.loc[merged_df['price'].isna(),'unit_price']
+products= merged_df.drop(columns= 'unit_price')
 
-###Convert column 'price' into data type numeric
-#It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first.
+"Now we are left with 22 null values. In my opinion, we can drop them safely, as we have seen that they were not ordered anyhow."
+#Dropping rows based on the remaining corrupted values.
+products.dropna(subset= ['price'], inplace=True)
+
+"We still have some null values in column 'type' but as per my understanding, we are not gonna use that column further in our analyses. So, for 
+now, ignoring it and not dropping rows (as they have other data) is a good idea."
+
+###Changing type of data.
+
+#Convert column 'price' into data type numeric
+"It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first."
 
 #% of corrupted values
 products['price'].str.count(r'\.').value_counts(normalize= True)
@@ -67,6 +100,10 @@ products.loc[p2,'price']= products.loc[p2,'price']/10
 
 ###Changing data type of column Promo_Price from object to numeric.
 #It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first.
+
+"I skipped changes in promo_price before saving the clean data frames because we probably not be using this column in our further analyses. 
+So, losing data based on it is pointless."
+"But following is the code to sort values for promo_price in case needed."
 
 products['promo_price'].str.count('\.').value_counts()
 
@@ -172,15 +209,7 @@ orderlines['unit_price'].str.count("\.").value_counts()
 #Let's work out how much that is as a percentage of our total data.
 mult_decimal_rows = (orderlines['unit_price'].str.count("\.")>1).value_counts(normalize= True)        #12.3%
 
-"This is a bit of a tricky decision as 12.3% is a significant amount of our data... and we might even end up losing a larger portion of 
-our data than this too. For the moment we will delete the rows as we only have 2 weeks for this project and I'd like some quick, accurate
-results to show. If we have time at the end, we can come back and investigate this problem further.
-Each row of orderlines represents a product in an order. For example, if order number 175 contained 3 separate products, then order 175 
-would have 3 rows in orderlines, one row for each of the products. If 2 of those products have 'normal' prices (14.99, 15.85) and 1 has a
-price with 2 decimal points (1.137.99), we need to remove the whole order and not just the affected row. If we only remove the row with 2
-decimal places then any later analysis about products and prices could be misleading.
-
-We therefore need to find the order numbers associated with the rows that have 2 decimal points, and then remove all the associated rows."
+"We'll try to save the corrupted values by comparing 'unit_price' from the orderlines to 'price' from the products."
 
 # Boolean mask to find the orders that contain a price with multiple decimal points
 multiple_decimal_mask = orderlines['unit_price'].str.count("\.") > 1
@@ -188,8 +217,33 @@ multiple_decimal_mask = orderlines['unit_price'].str.count("\.") > 1
 # Apply the boolean mask to the orderlines DataFrame. This way we can find the order_id of all the affected orders.
 corrupted_order_ids = orderlines.loc[multiple_decimal_mask, 'id_order']
 
-# Keep only the rows that do not have multiple decimal points
-orderlines= orderlines.loc[~orderlines['id_order'].isin(corrupted_order_ids)]
+#Merge the dataframes
+comparing= corrupted_order_ids.merge(products, on= 'sku', how= 'left')
+comparing[['id_order','sku','price','unit_price']]
 
-#Values with two decimal points removed so convert the column unit_price to the correct datatype
-orderlines["unit_price"] = pd.to_numeric(orderlines["unit_price"])
+"By comparison we can see that this first decimal point is somehow read wrong. Unit_price 1.137.99 is actually could be 1137.99 because its
+'orignal price' in products is 1219.00. Same for other values."
+
+#SO, let's remove the first decimal from unit_price and save the data :)
+#Removing first dot from values having 2 decimel points
+pp2= orderlines.loc[orderlines['unit_price'].str.count('\.')== 2].index
+orderlines.loc[pp2,'unit_price']= orderlines.loc[pp2,'unit_price'].astype(str).str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+
+#Change 'unit_price' to numeric
+orderlines['unit_price']= pd.to_numeric(orderlines['unit_price'], errors= 'coerce')
+
+***Saving the clean data frames:***
+
+from google.colab import files
+
+#Clean dataframe of Products:
+products.to_csv('products_cl.csv', index=False)
+files.download('products_cl.csv')
+
+#Clean dataframe of Orders
+orders.to_csv('orders_cl.csv', index=False)
+files.download('orders_cl.csv')
+
+#Clean dataframe of Orderlines
+orderlines.to_csv('orderlines_cl.csv', index=False)
+files.download('orderlines_cl.csv')
