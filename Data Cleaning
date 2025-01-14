@@ -113,7 +113,7 @@ products['promo_price']= pd.to_numeric(products['promo_price'], errors='coerce')
 #Filtering out the corrupted values
 mask= products.loc [round(products['promo_price']) > round(products['price'])].index
 
-#Correcting the position of decimal by moving it to one digit left.
+# Correct the position of the decimal by moving it to one digit on the left.
 products.loc[mask,'promo_price']= products.loc[mask,'promo_price']/10
 
 #Check
@@ -126,7 +126,7 @@ products.loc[mask,'promo_price']= products.loc[mask,'promo_price']/10
 still_corrupted= (products.loc[round(products['promo_price']) > round(products['price'])]).index
 products= products.drop(still_corrupted)
 
-"The second idea makes more sense and check gives 0 value means all the promo prices are now either less or equal to the original price.
+"The second idea makes more sense and all the promo prices are now either less or equal to the original price.
 And in still corrupted values we just dropped 123 rows(1.21%)"
 
 *** Cleaning Dataframe ORDERS:***
