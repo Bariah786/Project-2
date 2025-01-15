@@ -101,9 +101,10 @@ products.loc[p2,'price']= products.loc[p2,'price']/10
 ###Changing data type of column Promo_Price from object to numeric.
 #It has few values with two decimal points so using simple 'to_numeric' will not work here. We have to get rid of one decimal point first.
 
-"I skipped changes in promo_price before saving the clean data frames because we probably not be using this column in our further analyses. 
-So, losing data based on it is pointless."
-"But following is the code to sort values for promo_price in case needed."
+"I sorted data in promo_price (using the second idea from following) but skipped dropping rows based on corrupted values in promo_price
+because we probably not be using this column in our further analyses. So, losing data based on it is pointless."
+
+#Following is the code to sort values for 'promo_price'."
 
 products['promo_price'].str.count('\.').value_counts()
 
@@ -151,13 +152,15 @@ products['promo_price']= pd.to_numeric(products['promo_price'], errors='coerce')
 mask= products.loc [round(products['promo_price']) > round(products['price'])].index
 
 # Correct the position of the decimal by moving it to one digit on the left.
-products.loc[mask,'promo_price']= products.loc[mask,'promo_price']/10
+products.loc[mask,'promo_price']= round((products.loc[mask,'promo_price']/10),2)
 
 #Check
 ((products.loc[round(products['promo_price']) > round(products['price'])]).count()/ len(products['promo_price']))*100
 
 #% of still corrupted values
 1.21
+
+"I used till here only but in case to get rid of corrupted values following code can be used."
 
 #To get rid of them
 still_corrupted= (products.loc[round(products['promo_price']) > round(products['price'])]).index
