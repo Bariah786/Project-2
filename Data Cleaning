@@ -63,8 +63,8 @@ products.loc[products['desc'].isna(),'desc'] = products.loc[products['desc'].isn
 #% of Null values in price
 (products['price'].isna().value_counts(normalize= True))*100
 
-"Column price has 46 null values out of which I guess we can still fill some using the orderlines data frame. Using SKU we can find the Max price 
-of the product at which it has been sold."
+"Column price has 46 null values out of which I guess we can still fill some using the orderlines data frame. Using SKU we can find the Max
+price of the product at which it has been sold."
 
 #Fillin g the missing values of price
 max_sku_prices = orderlines_df.groupby('sku')['unit_price'].max().reset_index()
@@ -76,8 +76,8 @@ products= merged_df.drop(columns= 'unit_price')
 #Dropping rows based on the remaining corrupted values.
 products.dropna(subset= ['price'], inplace=True)
 
-"We still have some null values in column 'type' but as per my understanding, we are not gonna use that column further in our analyses. So, for 
-now, ignoring it and not dropping rows (as they have other data) is a good idea."
+"We still have some null values in column 'type' but as per my understanding, we are not gonna use that column further in our analyses. So,
+for now, ignoring it and not dropping rows (as they have other data) is a good idea."
 
 ###Changing type of data.
 
@@ -87,10 +87,9 @@ now, ignoring it and not dropping rows (as they have other data) is a good idea.
 #% of corrupted values
 products['price'].str.count(r'\.').value_counts(normalize= True)
 
-#Sorting the corrupted values
+#Dropping the corrupted values
 p2= products.loc[products['price'].str.count('\.')== 2].index
-products.loc[p2,'price']= products.loc[p2,'price'].astype(str)\
-   .str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+products= products.drop(p2)
 
 #Converting 'price' to numeric
 products['price']= pd.to_numeric(products['price'], errors='coerce')
@@ -230,7 +229,8 @@ comparing[['id_order','sku','price','unit_price']]
 #SO, let's remove the first decimal from unit_price and save the data :)
 #Removing first dot from values having 2 decimel points
 pp2= orderlines.loc[orderlines['unit_price'].str.count('\.')== 2].index
-orderlines.loc[pp2,'unit_price']= orderlines.loc[pp2,'unit_price'].astype(str).str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) + m.group(2) + '.' + m.group(3), regex=True) 
+orderlines.loc[pp2,'unit_price']= orderlines.loc[pp2,'unit_price'].astype(str).str.replace(r'(\d+)\.(\d+)\.(\d+)', lambda m: m.group(1) \
+                                    + m.group(2) + '.' + m.group(3), regex=True) 
 
 #Change 'unit_price' to numeric
 orderlines['unit_price']= pd.to_numeric(orderlines['unit_price'], errors= 'coerce')
