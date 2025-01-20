@@ -25,8 +25,146 @@ orders_qu= orders_cl.copy()
 orderlines_qu= orderlines_cl.copy()
 products_qu= products_cl.copy()
 
-1.  Define Pandas display format
+### 1.  Define Pandas display format
 
 pd.options.display.float_format = '{:,.2f}'.format
 pd.set_option('display.max_rows', 1000)
 
+### 2.  Exclude unwanted orders
+
+orders_qu.groupby('state').agg({'total_paid':'sum', 'order_id': 'count'})
+
+#Keeping only products with any of these 3 states Completed, Pending, or Place Oder
+
+needed_index= orders_qu.loc[(orders_qu['state']== 'Completed') | (orders_qu['state']== 'Pending') | (orders_qu['state']== 'Place Order')] \ 
+                                                          .index
+orders_qu= orders_qu.loc[needed_index]
+
+#Keeping only the orders that are present in both orders and orderlines
+#Let's begin by looking if there's a big difference between the amount of orders present in orders and orderlines.
+orders_qu['order_id'].nunique(),orderlines_qu.id_order.nunique()
+
+#What a huge difference! We want to make sure that every order_id in orders also exists in orderlines and vice versa.
+Hence we'll perform an inner merge on the two tables using the order_id & id_order. This will then keep only the order_id's that are present
+in both tables, which will then help us filter our _qu DataFrames once again.
+
+# order_ids that are in both tables
+needed_orders= orderlines_qu.merge(orders_qu, left_on='id_order', right_on= 'order_id', how = 'inner')['order_id']
+
+#Filtering both dataframes
+orders_qu = orders_qu.loc[orders_qu['order_id'].isin(needed_orders)]
+orderlines_qu = orderlines_qu[orderlines_qu['id_order'].isin(needed_orders)]
+
+### 3.  Exclude orders with unknown products
+#Joining orderlines left on products will keep all orderlines, and add the information of products on the matching skus. If an sku has been
+sold in orderlines, but the sku does not have an entry in products then the product_name will be empty.
+
+# Get the index of rows containing unknown products
+ol_p= orderlines_qu.merge(products_qu, on= 'sku', how= 'left')[["id_order","sku","name" ]]
+
+#number of null values
+ol_p.name.isna().sum()
+
+#We can't simply delete the rows containing unknown products. We need to remove the entirety of any order that contains an unknown product to 
+keep a consistent and coherent dataset.
+
+orders_to_delete= ol_p.loc[ol_p['name'].isna(), 'id_order'].unique()
+
+#Keep only orders in orders and orderlines, that are not in this list of corrupted orders
+# Drop these rows from the DataFrame
+orders_qu= orders_qu.loc[~orders_qu['order_id'].isin(orders_to_delete)]
+orderlines_qu= orderlines_qu.loc[~orderlines_qu['id_order'].isin(orders_to_delete)]
+
+### 4.  Exploring the revenue from different tables
+
+orderlines_qu['unit_price_total']= orderlines_qu['unit_price']*orderlines_qu['product_quantity']
+
+#Group by id_order, summarising by the sum of unit_price_total
+orderlines_qu.groupby('id_order')['unit_price_total'].sum()
+
+#The average difference between total_paid and unit_price_total
+total_unit_price= orderlines_qu.groupby('id_order').agg(
+    unit_price_total=('unit_price_total', 'sum'),
+    product_quantity=('product_quantity', 'count'),
+
+).reset_index()
+
+merged_df= total_unit_price.merge(orders_qu, left_on='id_order', right_on= 'order_id', how= 'inner')
+
+#Calculating the difference in prices
+merged_df['difference']= merged_df['total_paid']- merged_df['unit_price_total']
+
+#Checking
+merged_df['difference'].describe()
+
+## The distribution of these differences?
+
+import matplotlib.pyplot as plt
+
+box = merged_df.boxplot("difference");
+box.set_ylim(-30, +30)
+plt.show()
+
+#Looking at the data spread above, some of the difference must be due to corruption as seen in .describe.
+Our quartiles (0.00, 0.01, 4.99) show that most of our data fit an expected pattern - free, 0.01, and 4.99 all seem like
+reasonable prices to assume as postage. However, if we look at the minimum and maximum values, -165.00 and 3984.99, this can only occur due
+to corrupted data.
+
+## What to do with these orders?
+
+# calculate the quartiles
+Q1 = merged_df["difference"].quantile(0.25) 
+Q3 = merged_df["difference"].quantile(0.75)
+Q1, Q3
+
+# calculate the interquartile range
+IQR = Q3-Q1
+IQR
+
+# lower boundary
+Q1 - 1.5*IQR
+
+#upper boundary
+Q3 + 1.5*IQR
+
+# filter the DataFrame to include only "non-outliers"
+merged_no_outliers_df = merged_df.loc[
+    (merged_df["difference"] >= (Q1 - 1.5*IQR))
+    &
+    (merged_df["difference"] <= (Q3 + 1.5*IQR))
+    ,
+    :]
+
+#Let's look at the distribution again to see the effect of removing the outliers.
+#Histogram
+merged_no_outliers_df.difference.hist(bins= 50, figsize=(8,6))
+
+#Box plot
+import matplotlib.pyplot as plt
+import numpy as np
+
+merged_no_outliers_df.boxplot("difference",vert=False, patch_artist=True, boxprops=dict(facecolor="lightblue"))
+mean = np.mean(merged_df["difference"])
+# Add the mean line
+plt.axvline(mean, color='red', linestyle='--', label=f'Mean: {mean}')
+
+plt.show()
+
+#Now we need to remove these orders with extreme differences from our DataFrames.
+normal_diff_list = merged_no_outliers_df["order_id"]
+orders_qu = orders_qu.loc[orders_qu["order_id"].isin(normal_diff_list), :]
+orderlines_qu = orderlines_qu.loc[orderlines_qu["id_order"].isin(normal_diff_list), :]
+
+#Check
+orders_qu.shape, orderlines_qu.shape
+orderlines_qu['sku'].nunique(), products_qu['sku'].nunique()
+
+#Downloading these quality-controlled data frames.
+
+from google.colab import files
+
+orders_qu.to_csv("orders_qu.csv", index=False)
+files.download("orders_qu.csv")
+
+orderlines_qu.to_csv("orderlines_qu.csv", index=False)
+files.download("orderlines_qu.csv")
