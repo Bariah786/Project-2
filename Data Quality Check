@@ -1,1 +1,32 @@
+```python
+
+import pandas as pd
+
+*** Loading the data files ***
+
+# orders_cl.csv
+url = "https://drive.google.com/file/d/1ZnraC-SOP9Chzxb2Hbq9hNF-2APrBlxP/view?usp=sharing"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orders_cl = pd.read_csv(path)
+
+# orderlines_cl.csv
+url = "https://drive.google.com/file/d/1TrITdans15tKc4ynVEXHvGDJh5FsSy92/view?usp=sharing"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orderlines_cl = pd.read_csv(path)
+
+# products_cl.csv
+url = "https://drive.google.com/file/d/1Y-PNPKsL9bMJW3wDqPBjXyACy7MYIdHj/view?usp=sharing"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+products_cl = pd.read_csv(path)
+
+#Create copies
+
+orders_qu= orders_cl.copy()
+orderlines_qu= orderlines_cl.copy()
+products_qu= products_cl.copy()
+
+1.  Define Pandas display format
+
+pd.options.display.float_format = '{:,.2f}'.format
+pd.set_option('display.max_rows', 1000)
 
